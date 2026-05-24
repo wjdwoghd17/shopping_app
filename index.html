@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>쇼핑 리스트</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    h1 span { font-size: 1.5rem; }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .input-row input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      outline: none;
+      transition: border-color 0.2s;
+      background: #fff;
+      color: #1a202c;
+    }
+
+    .input-row input:focus { border-color: #667eea; }
+
+    .input-row button {
+      padding: 0.75rem 1.25rem;
+      font-size: 1.25rem;
+      background: #667eea;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .input-row button:hover { background: #5a67d8; }
+    .input-row button:active { transform: scale(0.95); }
+
+    .summary {
+      font-size: 0.85rem;
+      color: #718096;
+      margin-bottom: 0.75rem;
+      padding: 0 0.25rem;
+    }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: #fff;
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      transition: opacity 0.2s;
+      animation: slideIn 0.2s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .item.done { opacity: 0.5; }
+
+    .item input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: #667eea;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .item-text {
+      flex: 1;
+      font-size: 1rem;
+      color: #2d3748;
+      word-break: break-word;
+      transition: text-decoration 0.2s;
+    }
+
+    .item.done .item-text {
+      text-decoration: line-through;
+      color: #a0aec0;
+    }
+
+    .del-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.1rem;
+      color: #cbd5e0;
+      padding: 0.25rem;
+      border-radius: 6px;
+      transition: color 0.2s, background 0.2s;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .del-btn:hover { color: #e53e3e; background: #fff5f5; }
+
+    .empty {
+      text-align: center;
+      color: #a0aec0;
+      padding: 3rem 0;
+      font-size: 0.95rem;
+    }
+
+    .empty span { display: block; font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+    .clear-btn {
+      display: block;
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.6rem;
+      font-size: 0.85rem;
+      background: none;
+      color: #e53e3e;
+      border: 1.5px solid #fed7d7;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .clear-btn:hover { background: #fff5f5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><span>🛒</span> 쇼핑 리스트</h1>
+
+    <div class="input-row">
+      <input id="itemInput" type="text" placeholder="아이템 입력 후 Enter 또는 + 버튼" maxlength="100" />
+      <button id="addBtn" aria-label="추가">+</button>
+    </div>
+
+    <div class="summary" id="summary"></div>
+    <div class="list" id="list"></div>
+    <button class="clear-btn" id="clearBtn" style="display:none">완료 항목 모두 삭제</button>
+  </div>
+
+  <script>
+    const KEY = 'shopping_list_v1';
+    let items = JSON.parse(localStorage.getItem(KEY) || '[]');
+
+    const listEl    = document.getElementById('list');
+    const inputEl   = document.getElementById('itemInput');
+    const addBtn    = document.getElementById('addBtn');
+    const summaryEl = document.getElementById('summary');
+    const clearBtn  = document.getElementById('clearBtn');
+
+    function save() {
+      localStorage.setItem(KEY, JSON.stringify(items));
+    }
+
+    function render() {
+      listEl.innerHTML = '';
+
+      if (items.length === 0) {
+        listEl.innerHTML = '<div class="empty"><span>🛍️</span>아이템을 추가해 보세요!</div>';
+        summaryEl.textContent = '';
+        clearBtn.style.display = 'none';
+        return;
+      }
+
+      const done  = items.filter(i => i.checked).length;
+      const total = items.length;
+      summaryEl.textContent = `전체 ${total}개 · 완료 ${done}개`;
+      clearBtn.style.display = done > 0 ? 'block' : 'none';
+
+      items.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'item' + (item.checked ? ' done' : '');
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = item.checked;
+        cb.addEventListener('change', () => {
+          items[idx].checked = cb.checked;
+          save();
+          render();
+        });
+
+        const span = document.createElement('span');
+        span.className = 'item-text';
+        span.textContent = item.text;
+
+        const del = document.createElement('button');
+        del.className = 'del-btn';
+        del.textContent = '✕';
+        del.title = '삭제';
+        del.addEventListener('click', () => {
+          items.splice(idx, 1);
+          save();
+          render();
+        });
+
+        div.append(cb, span, del);
+        listEl.appendChild(div);
+      });
+    }
+
+    function addItem() {
+      const text = inputEl.value.trim();
+      if (!text) return;
+      items.unshift({ text, checked: false });
+      inputEl.value = '';
+      save();
+      render();
+    }
+
+    addBtn.addEventListener('click', addItem);
+    inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') addItem(); });
+    clearBtn.addEventListener('click', () => {
+      items = items.filter(i => !i.checked);
+      save();
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
